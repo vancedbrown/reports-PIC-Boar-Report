@@ -1,0 +1,229 @@
+---
+title:
+output: 
+  html_document:
+    theme: sandstone
+    toc: false
+    toc_depth: 1
+    toc_float: true
+---
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: 0px;
+  margin-right: 0px
+}
+</style>
+
+<h1><center>PIC Boar Training</h1>
+<br>
+<br>
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(writexl)
+library(here)
+library(kableExtra)
+library(writexl)
+library(writexl)
+library(openxlsx)
+library(readxl)
+
+source('C:/Users/vance/Documents/myR/functions/getSQL.r')
+
+pigraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/pig.csv", 
+                 col_types = cols(Index = col_number()))
+collraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/coll.csv")
+distraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/dist.csv")
+splitraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/split.csv")
+
+
+aaa<-"SELECT [StudID]
+      ,[BoarID]
+      ,[Name]
+      ,[Breed]
+      ,[Status]
+      ,[Date_Arrival]
+  FROM [Intranet].[dbo].[Boar_Pig]
+  WHERE [StudID] in ('MB 7081','MB 7082','SPGVA') 
+  and [Breed] in ('PICL02', 'PICL03')
+  and [Status] in ('WORKING','NONWORKING')"
+
+picpigs<-getSQL('Intranet', query = aaa)
+
+
+pigraw$Date_Arrival<-as.Date(pigraw$Date_Arrival)
+pigraw$Date_Studout<-as.Date(pigraw$Date_Studout)
+collraw$Col_Date<-as.Date(collraw$Col_Date)
+distraw$Date_Shipped<-as.Date(distraw$Date_Shipped)
+splitraw$Collnum<-as.numeric(splitraw$Collnum)
+
+pic1<-left_join(x = pigraw,y = collraw, by=c("BoarID"="BoarID"))
+
+write_csv(x = pic1, path = 'boars.csv')
+
+pic2<-pic1 %>% 
+  filter(`Boar Stud.x`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
+         Date_Arrival>'2020-01-01',
+         Breed%in%c('PICL02','PICL03'),
+         `Collection Status`%in%c('US','TR'),
+         !Col_Date=='2020-09-20',
+         `Boar Status`=='WORKING')
+
+pic3<-pic2 %>% 
+  group_by(`Boar Stud.x`,Breed) %>% 
+  summarise('Boars Jumped Once or More'=n_distinct(BoarID))
+
+pic4<-pic2 %>% 
+  group_by(`Boar Stud.x`,Breed) %>% 
+  filter(`Collection Status`=='US') %>% 
+  summarise('Boars Producing'=n_distinct(BoarID))
+
+pic5<-pic2 %>% 
+  group_by(`Boar Stud.x`,Breed) %>% 
+  filter(`Collection Status`=='US',
+         Col_Date>=floor_date(x = today(),unit = "week",week_start = 7)-21) %>% 
+  summarise('Doses Per Collection'=mean(Tot_Sperm)/2)
+
+pic6<-pigraw %>% 
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
+         Date_Arrival>'2020-01-01',
+         Breed%in%c('PICL02','PICL03'),
+         `Boar Status`=='WORKING') %>% 
+  group_by(`Boar Stud`,Breed) %>% 
+  summarise('Total Boars in Stud'=n_distinct(BoarID))
+
+
+
+pic7<-left_join(x = pic6,y = pic3,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+pic8<-left_join(x = pic7,y = pic4,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+pic9<-left_join(x = pic8,y = pic5,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+
+pic9$`Boars Not Jumped Once`<-pic9$`Total Boars in Stud`-pic9$`Boars Jumped Once or More`
+
+pic9<-pic9[c(1,2,4,3,7,5,6)]
+
+write_csv(x = pic9,path = here::here("PIC_Update.csv"))
+
+pic10<-pic2 %>% 
+  group_by(`Boar Stud.x`,Breed, Date_Arrival) %>% 
+  summarise('Boars Jumped Once or More'=n_distinct(BoarID))
+
+pic11<-pigraw %>% 
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
+         Date_Arrival>'2020-01-01',
+         Breed%in%c('PICL02','PICL03')) %>%  
+  group_by(`Boar Stud`,Breed, Date_Arrival) %>% 
+  summarise('Total Boars Entered'=n_distinct(BoarID))
+
+pic12<-pigraw %>% 
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
+         Date_Arrival>'2020-01-01',
+         Breed%in%c('PICL02','PICL03'),
+         `Boar Status`=='WORKING') %>% 
+  group_by(`Boar Stud`,Breed, Date_Arrival) %>% 
+  summarise('Working Boars'=n_distinct(BoarID))
+
+
+pic13<-left_join(x = pic11,y = pic12,by=c("Boar Stud"="Boar Stud","Date_Arrival"="Date_Arrival", "Breed"="Breed"))
+pic14<-left_join(x = pic13,y = pic10,by=c("Boar Stud"="Boar Stud.x","Date_Arrival"="Date_Arrival", "Breed"="Breed"))
+
+pic15<-distraw %>% 
+  filter(`Boar Stud`%in%c('SPGVA','MB 7081', 'MB 7082'),
+         Dest!='* TRASH *',
+         Breed%in%c('PICL02','PICL03'),
+         Date_Shipped>'2020-01-01')
+
+pic16<-left_join(x = pic15,y = splitraw, by=c("Boar Stud"="Boar Stud","BatchNum"="BatchNum"))
+pic17<-left_join(x = pic16,y = pigraw, by=c("BoarID"="BoarID"))
+
+pic18<-pic17 %>% 
+  group_by(`Boar Stud.x`,Breed.x) %>%
+  filter(`Boar Status`=='WORKING') %>% 
+  summarise('Boars Distributed'=n_distinct(BoarID))
+
+
+pic18<-left_join(x = pic9,y = pic18, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed.x"))
+
+pic18<-pic18[c(1,2,4,3,5,6,8,7)]
+
+kbl(pic18,align = 'c', digits = 2)%>% 
+  kable_styling(full_width = F,
+                font_size = 16)
+```
+
+<br>
+<br>
+<br>
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+kbl(pic14,align = 'c', digits = 2)%>% 
+  kable_styling(full_width = F,
+                font_size = 16)
+```
+
+
+
+```{r}
+picpigs$BoarID<-as.character(picpigs$BoarID)
+
+pic19<-left_join(x = picpigs,y = collraw, by=c("BoarID"="BoarID"))
+
+pic20<-pic19 %>% 
+  group_by(BoarID) %>% 
+  filter(`Collection Status`%in%c('US','TR','NC')) %>% 
+  summarise('Collection Attempts'=n())
+
+pic21<-pic19 %>% 
+  group_by(BoarID) %>% 
+  filter(`Collection Status`%in%c('US','TR')) %>% 
+  summarise('Successful Collections'=n())
+
+pic22<-pic19 %>% 
+  group_by(BoarID) %>% 
+  filter(`Collection Status`=='US') %>% 
+  summarise('Acceptable Collections'=n())
+
+pic23<-pic17 %>% 
+  group_by(BoarID) %>% 
+  summarise('Doses'=sum(Doses))
+
+pic24<-left_join(x = picpigs,y = pic20,by=c("BoarID"="BoarID"))
+pic25<-left_join(x = pic24,y = pic21,by=c("BoarID"="BoarID"))
+pic26<-left_join(x = pic25,y = pic22,by=c("BoarID"="BoarID"))
+pic27<-left_join(x = pic26,y = pic23,by=c("BoarID"="BoarID"))
+
+pic27$`Days In Stud`<-today()-as.Date(pic27$Date_Arrival)
+
+pic28<-pic27 %>% 
+  mutate('Distributed'=ifelse(is.na(pic27$Doses),'NO','YES'))
+
+pic28[is.na(pic28)]<-0
+
+pic29<-pic28 %>% 
+  filter(`Days In Stud`<=40,
+         Distributed=='NO') %>% 
+  mutate('Apply for Credit'="",
+         'Reason'="")
+
+pic29<-pic29[c(1:5,7:9,12,11,13,14)]
+
+hs<- createStyle(textDecoration = "BOLD")
+
+deer<-pic29 %>% filter(StudID=='MB 7081')
+write.xlsx(deer,"7081_Eligible_Credits.xlsx", colWidths="auto", headerStyle = hs)
+
+laur<-pic29 %>% filter(StudID=='MB 7082')
+write.xlsx(laur,"7082_Eligible_Credits.xlsx", colWidths="auto", headerStyle = hs)
+
+spgv<-pic29 %>% filter(StudID=='SPGVA')
+write.xlsx(spgv,"7069_Eligible_Credits.xlsx", colWidths="auto", headerStyle = hs)
+
+```
+
+
