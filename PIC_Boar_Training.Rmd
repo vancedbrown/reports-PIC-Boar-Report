@@ -36,11 +36,11 @@ library(readxl)
 
 source('C:/Users/vance/Documents/myR/functions/getSQL.r')
 
-pigraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/pig.csv", 
+pigraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/pig.csv", 
                  col_types = cols(Index = col_number()))
-collraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/coll.csv")
-distraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/dist.csv")
-splitraw<-read_csv("C:/Users/vance/Documents/projects/2019/01JAN/Data Pull/split.csv")
+collraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/coll.csv")
+distraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/dist.csv")
+splitraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/split.csv")
 
 
 aaa<-"SELECT [StudID]
@@ -169,7 +169,7 @@ kbl(pic14,align = 'c', digits = 2)%>%
 
 
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 picpigs$BoarID<-as.character(picpigs$BoarID)
 
 pic19<-left_join(x = picpigs,y = collraw, by=c("BoarID"="BoarID"))
@@ -206,8 +206,7 @@ pic28<-pic27 %>%
 pic28[is.na(pic28)]<-0
 
 pic29<-pic28 %>% 
-  filter(`Days In Stud`<=40,
-         Distributed=='NO') %>% 
+  filter(Distributed=='NO') %>% 
   mutate('Apply for Credit'="",
          'Reason'="")
 
