@@ -1,11 +1,11 @@
 ---
 title:
 output: 
-  html_document:
+  html_document: 
     theme: sandstone
-    toc: false
     toc_depth: 1
-    toc_float: true
+    toc_float: yes
+    keep_md: yes
 ---
 <style type="text/css">
 .main-container {
@@ -117,10 +117,11 @@ pic10<-pic2 %>%
 pic11<-pigraw %>% 
   filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
-         Breed%in%c('PICL02','PICL03')) %>%  
+         Breed%in%c('PICL02','PICL03'),
+         Date_Studout!='2021-03-11' | is.na(Date_Studout))%>%  
   group_by(`Boar Stud`,Breed, Date_Arrival) %>% 
   summarise('Total Boars Entered'=n_distinct(BoarID))
-
+  
 pic12<-pigraw %>% 
   filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
