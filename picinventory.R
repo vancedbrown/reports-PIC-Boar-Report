@@ -22,7 +22,7 @@ query1<-"SELECT a.[StudID] AS 'STUD'
   FROM [Intranet].[dbo].[Boar_Pig] a
   left join [Intranet].[dbo].[Boar_LookUp] c on a.[StudID] = c.[StudID] and a.[Dispose_Code]=c.[ID]
   WHERE a.[StudID] in ('MB 7081','MB 7082','SPGVA', 'MB 7093') 
-  and a.[Breed] in ('PICL02', 'PICL03','PIC800')
+  and a.[Breed] in ('PICL02', 'PICL03','PIC800','PICL92')
   and a.[Date_Arrival]>'2020-01-01'"
 
 inv1<-getSQL('Intranet', query = query1)
@@ -34,4 +34,6 @@ inv2<-read_csv('transfercodekey.csv')
 inv3<-left_join(x = inv1,y = inv2,by=c("SPG_REASON"="SPG_REASON"))
 
 write_csv(x = inv3, file = 'picinventory.csv')
+
+### MAKE SURE TO FIX BOAR 58023, CORRECT NAME IS PIC2085491765 ###
 

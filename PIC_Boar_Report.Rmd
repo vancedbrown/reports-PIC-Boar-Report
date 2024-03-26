@@ -42,6 +42,7 @@ collraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/d
 distraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/dist.csv")
 splitraw<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/data/data-SQL-BS-Data-Pull/split.csv")
 
+ngr<-read_csv("C:/Users/vance/Documents/projects/Working Project Directory/reports/reports-BS-Master-Report/data/ngr.csv")
 
 aaa<-"SELECT a.[StudID]
       ,a.[BoarID]
@@ -52,8 +53,8 @@ aaa<-"SELECT a.[StudID]
 	  ,b.[idx]
   FROM [Intranet].[dbo].[Boar_Pig] a
   inner join [OADB].[reports].[idxCurrent] b on a.[Name] = b.[spg_id]
-  WHERE [StudID] in ('MB 7081','MB 7082','SPGVA', 'MB 7093') 
-  and [Breed] in ('PICL02', 'PICL03','PIC800')
+  WHERE [StudID] in ('MB 7081','MB 7082','SPGVA') 
+  and [Breed] in ('PICL02', 'PICL03')
   and [Status] in ('WORKING','NONWORKING')
   and [BoarID] not like ('PIC%')"
 
@@ -71,9 +72,9 @@ pic1<-left_join(x = pigraw,y = collraw, by=c("BoarID"="BoarID"))
 write_csv(x = pic1, path = 'boars.csv')
 
 pic2<-pic1 %>% 
-  filter(`Boar Stud.x`%in%c('SPGVA', 'MB 7081', 'MB 7082','MB 7093'),
+  filter(`Boar Stud.x`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
-         Breed%in%c('PICL02','PICL03','PIC800'),
+         Breed%in%c('PICL02','PICL03'),
          `Collection Status`%in%c('US','TR'),
          !Col_Date=='2020-09-20',
          `Boar Status`=='WORKING')
@@ -94,9 +95,9 @@ pic5<-pic2 %>%
   summarise('Doses Per Collection'=mean(Tot_Sperm)/2)
 
 pic6<-pigraw %>% 
-  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082','MB 7093'),
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
-         Breed%in%c('PICL02','PICL03','PIC800'),
+         Breed%in%c('PICL02','PICL03'),
          `Boar Status`=='WORKING') %>% 
   group_by(`Boar Stud`,Breed) %>% 
   summarise('Total Boars in Stud'=n_distinct(BoarID))
@@ -113,22 +114,31 @@ pic9<-pic9[c(1,2,4,3,7,5,6)]
 
 write_csv(x = pic9,path = here::here("PIC_Update.csv"))
 
-pic10<-pic2 %>% 
-  group_by(`Boar Stud.x`,Breed, Date_Arrival) %>% 
-  summarise('Boars Jumped Once or More'=n_distinct(BoarID))
+pic2a<-pic1 %>% 
+  filter(`Boar Stud.x`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
+         Date_Arrival>'2020-01-01',
+         Breed%in%c('PICL02','PICL03'),
+         `Collection Status`%in%c('US','TR'),
+         !Col_Date=='2020-09-20') %>% 
+  mutate(train=ifelse(Col_Date<=Date_Arrival+7,1,0))
+
+pic10<-pic2a %>% 
+  group_by(`Boar Stud.x`,Breed, Date_Arrival) %>%
+  filter(train==1) %>% 
+  summarise('Boars Collected 1st Week'=n_distinct(BoarID))
 
 pic11<-pigraw %>% 
-  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082','MB 7093'),
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
-         Breed%in%c('PICL02','PICL03','PIC800'),
+         Breed%in%c('PICL02','PICL03'),
          Date_Studout!='2021-03-11' | is.na(Date_Studout))%>%  
   group_by(`Boar Stud`,Breed, Date_Arrival) %>% 
   summarise('Total Boars Entered'=n_distinct(BoarID))
   
 pic12<-pigraw %>% 
-  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082','MB 7093'),
+  filter(`Boar Stud`%in%c('SPGVA', 'MB 7081', 'MB 7082'),
          Date_Arrival>'2020-01-01',
-         Breed%in%c('PICL02','PICL03','PIC800'),
+         Breed%in%c('PICL02','PICL03'),
          `Boar Status`=='WORKING') %>% 
   group_by(`Boar Stud`,Breed, Date_Arrival) %>% 
   summarise('Working Boars'=n_distinct(BoarID))
@@ -137,10 +147,13 @@ pic12<-pigraw %>%
 pic13<-left_join(x = pic11,y = pic12,by=c("Boar Stud"="Boar Stud","Date_Arrival"="Date_Arrival", "Breed"="Breed"))
 pic14<-left_join(x = pic13,y = pic10,by=c("Boar Stud"="Boar Stud.x","Date_Arrival"="Date_Arrival", "Breed"="Breed"))
 
+pic14[is.na(pic14)]<-0
+pic14$`Percent Trained`<-(pic14$`Boars Collected 1st Week`/pic14$`Total Boars Entered`)*100
+
 pic15<-distraw %>% 
-  filter(`Boar Stud`%in%c('SPGVA','MB 7081', 'MB 7082','MB 7093'),
+  filter(`Boar Stud`%in%c('SPGVA','MB 7081', 'MB 7082'),
          Dest!='* TRASH *',
-         Breed%in%c('PICL02','PICL03','PIC800'),
+         Breed%in%c('PICL02','PICL03'),
          Date_Shipped>'2020-01-01')
 
 pic16<-left_join(x = pic15,y = splitraw, by=c("Boar Stud"="Boar Stud","BatchNum"="BatchNum"))
@@ -150,6 +163,8 @@ pic18<-pic17 %>%
   group_by(`Boar Stud.x`,Breed.x) %>%
   filter(`Boar Status`=='WORKING') %>% 
   summarise('Total Boars Distributed'=n_distinct(BoarID))
+
+write_csv(pic17, 'dist.csv')
 
 
 pic18<-left_join(x = pic9,y = pic18, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed.x"))
@@ -162,16 +177,16 @@ pic17$wk<-isoweek(pic17$Date_Shipped)
 pic18a<-pic17 %>% 
   group_by(`Boar Stud.x`,Breed.x,wk) %>%
   filter(`Boar Status`=='WORKING',
-         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-84) %>% 
+         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-21) %>% 
   summarise(distrib=n_distinct(BoarID)) %>%
   ungroup() %>% 
   group_by(`Boar Stud.x`,Breed.x) %>% 
-  summarise('12 Week Average Boars Distributed'=mean(distrib))
+  summarise('3 Week Average Boars Distributed'=mean(distrib))
 
 
 pic18b<-pic17 %>% 
   filter(`Boar Status`=='WORKING',
-         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-84) %>% 
+         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-21) %>% 
   group_by(BoarID) %>% 
   mutate(n=n_distinct(Date_Shipped)) %>% 
   filter(n>0) %>%
@@ -239,7 +254,7 @@ pica5<-pica4 %>%
 ###################################
 
 pic18h<-left_join(x = pic18,y = pic18a,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed.x"))
-pic18i<-left_join(x = pic18h,y = pica5,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed.x"))
+pic18i<-left_join(x = pic18h,y = pic18g,by=c("Boar Stud"="StudID","Breed"="Breed"))
 
 pic18j<-pic2 %>% 
   group_by(`Boar Stud.x`,Breed) %>% 
@@ -254,9 +269,19 @@ pic18ja<-pic2 %>%
 pic18k<-left_join(x = pic18i, y = pic18j, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
 pic18ka<-left_join(x = pic18k, y = pic18ja, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
 
-pic18ka<-pic18ka[c(1:9,11,12,10)]
+picngr1<-ngr %>% 
+  filter(DESCR%in%c('DIED','FEETANDLEGS','WILL NOT TRAIN') | is.na(DESCR),
+         Breed%in%c('PICL02','PICL03')) %>% 
+  group_by(`Boar Stud.x`, Breed) %>% 
+  summarise('Non-Genetic Removals'=n_distinct(BoarID))
 
-kbl(pic18ka,align = 'c', digits = 2)%>% 
+pic18kb<-left_join(x = pic18ka,y = picngr1, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+
+pic18kb<-pic18kb[c(1:3,5:9,11,12,10,13)]
+
+pic18kb[is.na(pic18kb)]<-0
+
+kbl(pic18kb,align = 'c', digits = 2)%>% 
   kable_styling(full_width = F,
                 font_size = 16)
 ```
@@ -266,7 +291,107 @@ kbl(pic18ka,align = 'c', digits = 2)%>%
 <br>
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
-kbl(pic14,align = 'c', digits = 2)%>% 
+picss1<-pic17 %>% 
+  filter(Breed.x=='PICL03') %>% 
+  filter(Dest%in%c('Dogwood Trad.','PRESTAGE P60 TRAD','FOX RIDGE SOW FARM TRAD','W4 TRAD')) %>% 
+  filter(Date_Shipped>=today()-28)
+
+picss2<-picss1 %>% 
+  group_by(Dest) %>% 
+  summarise('Boars Sent'=n_distinct(BoarID))
+
+picss3<-picss1 %>% 
+  group_by(Dest) %>% 
+  filter(!is.na(Index)) %>% 
+  summarise('Average Index'=mean(Index))
+
+picss4<-picss1 %>% 
+  group_by(Dest) %>% 
+  summarise('Total Doses'=sum(Doses))
+
+picss5<-left_join(x = picss2,y = picss3, by=c("Dest"="Dest"))
+picss6<-left_join(x = picss5,y = picss4, by=c("Dest"="Dest"))
+
+kbl(picss6,align = 'c', digits = 2)%>% 
+  kable_styling(full_width = F,
+                font_size = 16)
+```
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+pic14a<-pic14 %>% 
+  group_by(`Boar Stud`,Breed) %>% 
+  slice_max(order_by = Date_Arrival, n = 2)
+
+kbl(pic14a,align = 'c', digits = 2)%>% 
+  kable_styling(full_width = F,
+                font_size = 16)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+picb1<-distraw %>% 
+  filter(`Boar Stud`%in%c('SPGVA','MB 7081', 'MB 7082'),
+         Breed%in%c('PICL02','PICL03'),
+         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-7) %>% 
+  group_by(`Boar Stud`,Breed) %>% 
+  summarise('Doses Produced'=sum(Doses))
+
+picb2<-pic15 %>% 
+  group_by(`Boar Stud`,Breed) %>% 
+  filter(Dest!='* TRASH *',
+         Date_Shipped>=floor_date(x = today(),unit = "week", week_start = 1)-7) %>% 
+  summarise('Total Doses Sold'=sum(Doses))
+
+picb3<-pic1 %>%
+  mutate(wc=floor_date(x = Col_Date, unit = "week", week_start = 1)) %>% 
+  filter(wc<floor_date(x = today(),unit = "week",week_start = 1)) %>% 
+  filter(`Collection Status`!='NC') %>% 
+  filter(Breed%in%c('PICL03','PICL02')) %>% 
+  filter(`Boar Stud.x`%in%c('MB 7081','MB 7082','SPGVA')) %>% 
+  group_by(BoarID, `Boar Stud.x`) %>% 
+  mutate(dr=row_number(desc(Col_Date)),
+         count=rowsum(dr,group = BoarID))
+
+picb4<-picb3 %>% 
+  group_by(BoarID) %>% 
+  filter(count!=1)
+
+picb5<-picb4 %>% 
+  group_by(BoarID, `Boar Stud.x`) %>% 
+  mutate(date1=Col_Date[dr==1],
+         date2=Col_Date[dr==2],
+         rest=date1-date2) %>% 
+  filter(rest!=0)
+
+picb6<-picb5 %>% 
+  group_by(BoarID) %>% 
+  top_n(1,Col_Date)
+
+picb7<-picb6 %>% 
+  filter(wc==floor_date(x = today(),unit = "week",week_start = 1)-7) %>% 
+  group_by(`Boar Stud.x`,Breed) %>% 
+  summarise('Average Days Rest'=mean(rest))
+
+picb8<-pic1 %>% 
+  filter(Date_Studout<floor_date(x = today(), unit = "week", week_start = 1),
+         Date_Studout>=floor_date(x = today(), unit = "week", week_start = 1)-7,
+         `Boar Status`=='DEAD',
+         Breed%in%c('PICL03','PICL02'),
+         `Boar Stud.x`%in%c('SPGVA','MB 7081','MB 7082')) %>% 
+  group_by(`Boar Stud.x`, Breed) %>% 
+  summarise('Deaths Last Week'=n_distinct(BoarID))
+
+picb9<-left_join(x = picb1,y = picb2, by=c("Boar Stud"="Boar Stud","Breed"="Breed"))
+picb9$`Percent Used`<-(picb9$`Total Doses Sold`/picb9$`Doses Produced`)*100
+picb10<-left_join(x = picb9,y = picb7, by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+picb11<-left_join(x = picb10,y = picb8,by=c("Boar Stud"="Boar Stud.x","Breed"="Breed"))
+
+picb11[is.na(picb11)]<-0
+
+kbl(picb11,align = 'c', digits = 2)%>% 
   kable_styling(full_width = F,
                 font_size = 16)
 ```
